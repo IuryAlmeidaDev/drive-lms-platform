@@ -1,6 +1,10 @@
 # Plataforma de Curso com Google Drive & Google Apps Script
 
+[![Acessar Plataforma](https://img.shields.io/badge/Acessar%20Plataforma-Online-brightgreen?style=for-the-badge&logo=vercel)](https://drive-lms-platform.vercel.app)
+
 Uma plataforma LMS moderna, de alta performance e visual impecável (construída com **React + TypeScript + Tailwind CSS + shadcn/ui**), alimentada diretamente por arquivos de vídeo e materiais hospedados em pastas do seu **Google Drive**, através de uma API serverless gratuita criada no **Google Apps Script**.
+
+🔗 **Link de Acesso Direto:** [https://drive-lms-platform.vercel.app](https://drive-lms-platform.vercel.app)
 
 ---
 
