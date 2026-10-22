@@ -43,5 +43,24 @@ export interface CourseProgress {
   completedLessonIds: string[];
   lastActiveLessonId: string | null;
   autoplay: boolean;
-  notes: Record<string, string>; // lessonId -> anotações do aluno
+  notes: Record<string, string>;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  picture?: string;
+  isGuest?: boolean;
+}
+
+export interface UserCourse {
+  id: string;
+  folderId: string;
+  title: string;
+  totalLessons: number;
+  completedLessons: number;
+  progressPercentage: number;
+  lastActiveLessonId?: string;
+  createdAt?: string;
 }
