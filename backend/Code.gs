@@ -103,7 +103,6 @@ function getOrCreateDatabase() {
   }
 
   if (!spreadsheet) {
-    // Procura se já existe planilha com nome LMS_DATABASE
     var files = DriveApp.getFilesByName("LMS_DATABASE");
     if (files.hasNext()) {
       var file = files.next();
@@ -115,7 +114,6 @@ function getOrCreateDatabase() {
     }
   }
 
-  // Garante aba 'Cursos'
   var cursosSheet = spreadsheet.getSheetByName("Cursos");
   if (!cursosSheet) {
     cursosSheet = spreadsheet.insertSheet("Cursos");
@@ -123,7 +121,6 @@ function getOrCreateDatabase() {
     cursosSheet.setFrozenRows(1);
   }
 
-  // Garante aba 'Progresso'
   var progressoSheet = spreadsheet.getSheetByName("Progresso");
   if (!progressoSheet) {
     progressoSheet = spreadsheet.insertSheet("Progresso");
@@ -148,7 +145,6 @@ function getCoursesForUser(email) {
 
   var userCourses = [];
 
-  // Pula linha de cabeçalho (índice 0)
   for (var i = 1; i < cursosData.length; i++) {
     var row = cursosData[i];
     var rowEmail = (row[1] || "").toString().toLowerCase().trim();
@@ -160,7 +156,6 @@ function getCoursesForUser(email) {
       var totalLessons = parseInt(row[4] || 0, 10);
       var createdAt = row[5];
 
-      // Conta aulas concluídas na aba de progresso
       var completedCount = 0;
       var lastActiveId = null;
 
@@ -204,7 +199,6 @@ function handleAddCourse(data) {
   var email = (data.email || "").toString().toLowerCase().trim();
   var folderId = (data.folderId || "").trim();
 
-  // Limpa possíveis URLs do Drive para extrair o ID limpo
   if (folderId.indexOf("folders/") !== -1) {
     folderId = folderId.split("folders/")[1].split("?")[0].split("/")[0];
   } else if (folderId.indexOf("id=") !== -1) {
@@ -227,17 +221,13 @@ function handleAddCourse(data) {
 
   var courseTitle = (data.customTitle && data.customTitle.trim()) ? data.customTitle.trim() : folder.getName();
   
-  // Conta aulas de vídeo rapidamente
-  var subfolders = folder.getFolders();
+  // Conta aulas de vídeo recursivamente
+  var allFiles = collectAllFilesRecursively(folder);
   var count = 0;
-  while (subfolders.hasNext()) {
-    var sub = subfolders.next();
-    var files = sub.getFiles();
-    while (files.hasNext()) {
-      var f = files.next();
-      if (isVideo(f.getMimeType(), f.getName())) {
-        count++;
-      }
+  for (var k = 0; k < allFiles.length; k++) {
+    var f = allFiles[k].file;
+    if (isVideo(f.getMimeType(), f.getName())) {
+      count++;
     }
   }
 
@@ -368,12 +358,12 @@ function handleSaveProgress(data) {
 }
 
 // =========================================================================
-// DRIVE PARSER COM CACHE
+// DRIVE PARSER COM BUSCA RECURSIVA & SUPORTE A SUBPASTAS E SHORTCUTS
 // =========================================================================
 
 function getCourseContentFromDrive(folderId, forceRefresh) {
   var cache = CacheService.getScriptCache();
-  var cacheKey = "course_data_" + folderId;
+  var cacheKey = "course_data_v4_" + folderId;
   
   if (!forceRefresh) {
     var cached = cache.get(cacheKey);
@@ -409,27 +399,37 @@ function getCourseContentFromDrive(folderId, forceRefresh) {
     return a.name.localeCompare(b.name);
   });
 
+  // Percorre cada módulo
   for (var i = 0; i < rawModules.length; i++) {
     var modItem = rawModules[i];
-    var folder = modItem.folder;
+    var moduleFolder = modItem.folder;
     var cleanModuleTitle = modItem.name.replace(/^\d+[\s-_.]+/, "").trim();
 
-    var files = folder.getFiles();
+    // Coleta arquivos recursivamente dentro do módulo (incluindo subpastas internas!)
+    var allModuleFiles = collectAllFilesRecursively(moduleFolder);
     var videoFiles = [];
     var attachmentFiles = [];
 
-    while (files.hasNext()) {
-      var file = files.next();
+    for (var k = 0; k < allModuleFiles.length; k++) {
+      var item = allModuleFiles[k];
+      var rawFile = item.file;
+      var parentSubfolderName = item.parentName;
+
+      // Resolve atalhos do Drive se houver
+      var file = resolveDriveShortcut(rawFile);
       var mime = file.getMimeType();
       var fileName = file.getName();
 
       if (isVideo(mime, fileName)) {
         var vOrderMatch = fileName.match(/^(\d+)[\s-_.]*/);
+        var order = vOrderMatch ? parseInt(vOrderMatch[1], 10) : 999;
+        
         videoFiles.push({
           id: file.getId(),
           rawName: fileName,
-          order: vOrderMatch ? parseInt(vOrderMatch[1], 10) : 999,
-          mime: mime
+          order: order,
+          mime: mime,
+          parentSubfolder: parentSubfolderName
         });
       } else {
         var aOrderMatch = fileName.match(/^(\d+)[\s-_.]*/);
@@ -442,6 +442,7 @@ function getCourseContentFromDrive(folderId, forceRefresh) {
       }
     }
 
+    // Ordena os vídeos por numeração
     videoFiles.sort(function(a, b) {
       if (a.order !== b.order) return a.order - b.order;
       return a.rawName.localeCompare(b.rawName);
@@ -455,12 +456,21 @@ function getCourseContentFromDrive(folderId, forceRefresh) {
       
       var cleanLessonTitle = v.rawName
         .replace(/^\d+[\s-_.]+/, "")
-        .replace(/\.(mp4|webm|mkv|mov|avi)$/i, "")
+        .replace(/\.(mp4|m4v|webm|mkv|mov|avi|wmv|flv|ts|mpeg|mpg|3gp)$/i, "")
         .trim();
 
+      // Se estava dentro de uma subpasta específica (ex: "01 - Introdução"), agrega para clareza
+      var displayTitle = cleanLessonTitle || v.rawName;
+      if (v.parentSubfolder && v.parentSubfolder !== modItem.name) {
+        var cleanParent = v.parentSubfolder.replace(/^\d+[\s-_.]+/, "").trim();
+        if (cleanParent && displayTitle.indexOf(cleanParent) === -1) {
+          displayTitle = cleanParent + " - " + displayTitle;
+        }
+      }
+
       var lessonAttachments = [];
-      for (var k = 0; k < attachmentFiles.length; k++) {
-        var att = attachmentFiles[k];
+      for (var aIdx = 0; aIdx < attachmentFiles.length; aIdx++) {
+        var att = attachmentFiles[aIdx];
         if (att.order !== null && att.order === v.order) {
           lessonAttachments.push({
             id: att.id,
@@ -474,7 +484,7 @@ function getCourseContentFromDrive(folderId, forceRefresh) {
 
       moduleLessons.push({
         id: v.id,
-        title: cleanLessonTitle || v.rawName,
+        title: displayTitle,
         order: j + 1,
         videoUrl: "https://drive.google.com/file/d/" + v.id + "/preview",
         attachments: lessonAttachments
@@ -482,24 +492,24 @@ function getCourseContentFromDrive(folderId, forceRefresh) {
     }
 
     var generalAttachments = [];
-    for (var k = 0; k < attachmentFiles.length; k++) {
-      var att = attachmentFiles[k];
+    for (var gIdx = 0; gIdx < attachmentFiles.length; gIdx++) {
+      var genAtt = attachmentFiles[gIdx];
       var isLinked = moduleLessons.some(function(l) {
-        return l.attachments.some(function(a) { return a.id === att.id; });
+        return l.attachments.some(function(a) { return a.id === genAtt.id; });
       });
       if (!isLinked) {
         generalAttachments.push({
-          id: att.id,
-          title: att.rawName.replace(/^\d+[\s-_.]+/, "").trim(),
-          mimeType: att.mime,
-          viewUrl: "https://drive.google.com/file/d/" + att.id + "/view",
-          downloadUrl: "https://drive.google.com/uc?export=download&id=" + att.id
+          id: genAtt.id,
+          title: genAtt.rawName.replace(/^\d+[\s-_.]+/, "").trim(),
+          mimeType: genAtt.mime,
+          viewUrl: "https://drive.google.com/file/d/" + genAtt.id + "/view",
+          downloadUrl: "https://drive.google.com/uc?export=download&id=" + genAtt.id
         });
       }
     }
 
     modules.push({
-      id: folder.getId(),
+      id: moduleFolder.getId(),
       title: cleanModuleTitle || modItem.name,
       order: i + 1,
       lessons: moduleLessons,
@@ -527,9 +537,53 @@ function getCourseContentFromDrive(folderId, forceRefresh) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+/**
+ * Coleta recursivamente todos os arquivos dentro de uma pasta e suas subpastas
+ */
+function collectAllFilesRecursively(folder, list) {
+  list = list || [];
+  
+  // 1. Arquivos na pasta atual
+  var files = folder.getFiles();
+  while (files.hasNext()) {
+    list.push({
+      file: files.next(),
+      parentName: folder.getName()
+    });
+  }
+  
+  // 2. Subpastas internas
+  var subfolders = folder.getFolders();
+  while (subfolders.hasNext()) {
+    var sub = subfolders.next();
+    collectAllFilesRecursively(sub, list);
+  }
+  
+  return list;
+}
+
+/**
+ * Resolve atalhos do Google Drive
+ */
+function resolveDriveShortcut(file) {
+  try {
+    if (file.getMimeType() === "application/vnd.google-apps.shortcut") {
+      var targetId = file.getTargetId();
+      if (targetId) {
+        return DriveApp.getFileById(targetId);
+      }
+    }
+  } catch (err) {}
+  return file;
+}
+
+/**
+ * Verifica se um arquivo é de vídeo
+ */
 function isVideo(mime, fileName) {
+  if (!fileName) return false;
   if (mime && mime.indexOf("video/") === 0) return true;
-  return /\.(mp4|webm|mkv|mov|avi)$/i.test(fileName);
+  return /\.(mp4|m4v|webm|mkv|mov|avi|wmv|flv|ts|mpeg|mpg|3gp)$/i.test(fileName);
 }
 
 function createJsonResponse(data) {
