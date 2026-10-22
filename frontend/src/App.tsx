@@ -4,6 +4,7 @@ import {
   fetchCourseData,
   fetchUserCourses,
   deleteUserCourse,
+  getSharedCourses,
 } from "@/services/courseService";
 import { useCourseProgress } from "@/hooks/useCourseProgress";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,11 +17,17 @@ import { SettingsModal } from "@/components/SettingsModal";
 import { CoursesDashboard } from "@/components/CoursesDashboard";
 import { AddCourseModal } from "@/components/AddCourseModal";
 import { DriveFolderTutorialModal } from "@/components/DriveFolderTutorialModal";
-import { AlertCircle, Loader2, Sparkles, GraduationCap } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, GraduationCap, Play, FolderLock, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 export function App() {
   const { user, isAuthenticated, loginWithEmail, loginAsGuest, logout } = useAuth();
+
+  // Cursos compartilhados disponíveis para demonstração
+  const sharedCourses = useMemo(() => getSharedCourses(), []);
+  const [loginEmailInput, setLoginEmailInput] = useState("");
 
   // Estados de Visualização: 'dashboard' ou 'player'
   const [view, setView] = useState<"dashboard" | "player">("dashboard");
@@ -190,58 +197,116 @@ export function App() {
 
   const { percentage, completedCount } = calculateProgress(courseContent?.totalLessons || 0);
 
-  // Tela de Login (se não autenticado)
+  const handleAccessSharedCourse = useCallback(() => {
+    loginAsGuest();
+    const shared = sharedCourses[0];
+    if (shared) {
+      setSelectedUserCourse(shared);
+      setActiveLesson(null);
+      setView("player");
+      loadCourseContent(shared.folderId);
+    }
+  }, [loginAsGuest, sharedCourses, loadCourseContent]);
+
+  const handleLoginSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!loginEmailInput.trim()) return;
+      loginWithEmail(loginEmailInput.trim());
+    },
+    [loginEmailInput, loginWithEmail]
+  );
+
+  // Tela de Boas-Vindas / Escolha de Acesso (se não autenticado)
   if (!isAuthenticated || !user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 text-foreground selection:bg-primary/20">
-        <div className="w-full max-w-md p-8 rounded-3xl bg-card border border-border/80 shadow-2xl text-center space-y-6 animate-in zoom-in-95 duration-200">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary mx-auto shadow-sm">
-            <GraduationCap className="h-8 w-8" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 sm:p-6 text-foreground selection:bg-primary/20">
+        <div className="w-full max-w-2xl p-6 sm:p-10 rounded-3xl bg-card border border-border/80 shadow-2xl text-center space-y-8 animate-in zoom-in-95 duration-200">
+          <div className="space-y-3">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 text-primary mx-auto shadow-sm">
+              <GraduationCap className="h-8 w-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">Plataforma LMS Google Drive</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+                Assista a cursos diretamente do Google Drive com player 16:9, avanço automático e materiais de apoio.
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <h1 className="text-xl font-extrabold tracking-tight">Plataforma LMS Google Drive</h1>
-            <p className="text-xs text-muted-foreground">
-              Acesse seus cursos online consumindo vídeos e materiais diretamente do seu Drive.
-            </p>
-          </div>
+          {/* Duas opções claras de acesso */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 text-left">
+            {/* Opção 1: Curso Compartilhado */}
+            <div className="flex flex-col justify-between p-6 rounded-2xl bg-secondary/30 hover:bg-secondary/50 border border-border/70 hover:border-primary/40 transition-all space-y-4 group">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="border-primary/40 text-primary text-[10px] bg-primary/10">
+                    Acesso Aberto
+                  </Badge>
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">
+                  Ver Curso Compartilhado
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Acesse o <strong>Curso JAVA (Rocketseat)</strong> com 6 módulos e 37 aulas disponibilizado pelo autor. Não precisa vincular pasta.
+                </p>
+              </div>
 
-          <div className="space-y-3 pt-2">
-            <Button
-              variant="default"
-              size="lg"
-              onClick={() => loginWithEmail("iury.colombo@gmail.com", "Iury Colombo")}
-              className="w-full gap-2.5 font-semibold text-xs sm:text-sm h-11"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
-              Continuar com Google
-            </Button>
+              <Button
+                variant="default"
+                size="default"
+                onClick={handleAccessSharedCourse}
+                className="w-full text-xs font-semibold h-11 gap-2 shadow-md group-hover:shadow-primary/20"
+              >
+                <Play className="h-4 w-4 fill-current" />
+                Assistir Curso Compartilhado
+              </Button>
+            </div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={loginAsGuest}
-              className="w-full text-xs text-muted-foreground hover:text-foreground h-9"
-            >
-              Entrar como Convidado
-            </Button>
+            {/* Opção 2: Meu Espaço Pessoal */}
+            <div className="flex flex-col justify-between p-6 rounded-2xl bg-secondary/30 hover:bg-secondary/50 border border-border/70 hover:border-primary/40 transition-all space-y-4 group">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground text-[10px]">
+                    Biblioteca Privada
+                  </Badge>
+                  <FolderLock className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">
+                  Acessar Meus Cursos
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Entre com seu e-mail para ver <strong>apenas o que você tem acesso</strong> e vincular suas próprias pastas do Drive.
+                </p>
+              </div>
+
+              <form onSubmit={handleLoginSubmit} className="space-y-2.5">
+                <div className="flex gap-2">
+                  <Input
+                    type="email"
+                    placeholder="seu-email@gmail.com"
+                    value={loginEmailInput}
+                    onChange={(e) => setLoginEmailInput(e.target.value)}
+                    className="h-11 text-xs bg-background/80"
+                    required
+                  />
+                  <Button type="submit" variant="secondary" className="h-11 text-xs font-semibold px-4 shrink-0">
+                    Entrar
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between text-[11px] pt-1">
+                  <span className="text-muted-foreground">É o autor?</span>
+                  <button
+                    type="button"
+                    onClick={() => loginWithEmail("iury.colombo@gmail.com", "Iury Colombo")}
+                    className="text-primary hover:underline font-medium"
+                  >
+                    Entrar como Iury Colombo
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       </div>
@@ -281,6 +346,7 @@ export function App() {
         <CoursesDashboard
           user={user}
           courses={userCourses}
+          sharedCourses={sharedCourses}
           onSelectCourse={handleSelectCourse}
           onOpenAddModal={() => setIsAddModalOpen(true)}
           onOpenTutorialModal={() => setIsTutorialModalOpen(true)}

@@ -63,4 +63,6 @@ export interface UserCourse {
   progressPercentage: number;
   lastActiveLessonId?: string;
   createdAt?: string;
+  isShared?: boolean;
+  sharedBy?: string;
 }

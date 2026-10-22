@@ -13,14 +13,8 @@ export function useAuth() {
     } catch (e) {
       console.error("Erro ao carregar usuário salvo", e);
     }
-    // Usuário padrão inicial caso já tenha feito login anteriormente
-    return {
-      id: "u_iury",
-      name: "Iury Colombo",
-      email: "iury.colombo@gmail.com",
-      picture: "https://lh3.googleusercontent.com/a/ACg8ocJLxhrBNOpTMDm-iTKLRQE2cPVjmWW3S82UslzuYshxg8HtN8V4=s96-c",
-      isGuest: false,
-    };
+    // Para novos visitantes, inicia sem autenticação para escolher como acessar
+    return null;
   });
 
   useEffect(() => {
@@ -33,12 +27,20 @@ export function useAuth() {
 
   const loginWithEmail = useCallback((email: string, name?: string, picture?: string) => {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanName = name || cleanEmail.split("@")[0];
+    const isIury = cleanEmail === "iury.colombo@gmail.com";
+    const cleanName = isIury
+      ? "Iury Colombo"
+      : name || cleanEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+
+    const userPicture = isIury
+      ? "https://lh3.googleusercontent.com/a/ACg8ocJLxhrBNOpTMDm-iTKLRQE2cPVjmWW3S82UslzuYshxg8HtN8V4=s96-c"
+      : picture || undefined;
+
     const newUser: User = {
       id: "u_" + Math.random().toString(36).substring(2, 9),
       email: cleanEmail,
       name: cleanName,
-      picture: picture || undefined,
+      picture: userPicture,
       isGuest: false,
     };
     setUser(newUser);

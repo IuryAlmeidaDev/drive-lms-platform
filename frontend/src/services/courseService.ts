@@ -43,23 +43,47 @@ export function saveStoredConfig(config: CourseConfig): void {
 }
 
 /**
+ * Curso modelo compartilhado para demonstração pública
+ */
+export const SHARED_COURSES: UserCourse[] = [
+  {
+    id: "course-java-shared",
+    folderId: "1TzxdXZwV3Ful0ad05zWEZpJMc3TLE4oi",
+    title: "Curso JAVA (Rocketseat)",
+    totalLessons: 37,
+    completedLessons: 0,
+    progressPercentage: 0,
+    isShared: true,
+    sharedBy: "Iury Colombo",
+    createdAt: "2026-10-22T00:00:00.000Z",
+  },
+];
+
+export function getSharedCourses(): UserCourse[] {
+  return SHARED_COURSES;
+}
+
+/**
  * Busca a lista de cursos cadastrados para o usuário
  */
 export async function fetchUserCourses(email: string): Promise<UserCourse[]> {
   const config = getStoredConfig();
 
-  // Cursos padrão pré-carregados caso seja primeiro acesso ou offline
-  const defaultCourses: UserCourse[] = [
-    {
-      id: "course-java-default",
-      folderId: config.folderId || "1TzxdXZwV3Ful0ad05zWEZpJMc3TLE4oi",
-      title: "Curso JAVA",
-      totalLessons: 13,
-      completedLessons: 0,
-      progressPercentage: 0,
-      createdAt: new Date().toISOString(),
-    },
-  ];
+  // Para o Iury Colombo, mantemos o Curso JAVA como padrão se ainda não houver nenhum
+  const isOwner = email.toLowerCase().includes("iury");
+  const defaultCourses: UserCourse[] = isOwner
+    ? [
+        {
+          id: "course-java-default",
+          folderId: config.folderId || "1TzxdXZwV3Ful0ad05zWEZpJMc3TLE4oi",
+          title: "Curso JAVA",
+          totalLessons: 37,
+          completedLessons: 0,
+          progressPercentage: 0,
+          createdAt: new Date().toISOString(),
+        },
+      ]
+    : [];
 
   if (!config.apiUrl || !email) {
     const local = localStorage.getItem(`${STORAGE_KEY_USER_COURSES}_${email}`);
@@ -84,8 +108,11 @@ export async function fetchUserCourses(email: string): Promise<UserCourse[]> {
       return data.courses;
     }
 
-    // Se o usuário ainda não tiver nenhum curso cadastrado na planilha, sugere o curso inicial de Java
-    return defaultCourses;
+    // Se o usuário ainda não tiver nenhum curso cadastrado na nuvem:
+    // Retorna vazio para novos usuários (para que vejam apenas o que têm acesso),
+    // ou o curso do Iury caso seja o próprio Iury.
+    const local = localStorage.getItem(`${STORAGE_KEY_USER_COURSES}_${email}`);
+    return local ? JSON.parse(local) : defaultCourses;
   } catch (err) {
     console.warn("Aviso: Falha ao buscar cursos na nuvem. Usando cursos locais salvos.", err);
     const local = localStorage.getItem(`${STORAGE_KEY_USER_COURSES}_${email}`);
