@@ -11,9 +11,12 @@ import {
   ChevronLeft,
   HelpCircle,
   LogOut,
-  User as UserIcon,
+  Sun,
+  Moon,
+  LogIn,
 } from "lucide-react";
 import { User } from "@/types/course";
+import { UserAvatar } from "@/components/UserAvatar";
 
 interface HeaderProps {
   courseTitle: string;
@@ -24,6 +27,8 @@ interface HeaderProps {
   isRefreshing: boolean;
   user: User | null;
   isInPlayer: boolean;
+  isDark: boolean;
+  onToggleTheme: () => void;
   onRefresh: () => void;
   onOpenSettings: () => void;
   onOpenTutorial: () => void;
@@ -41,6 +46,8 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing,
   user,
   isInPlayer,
+  isDark,
+  onToggleTheme,
   onRefresh,
   onOpenSettings,
   onOpenTutorial,
@@ -147,30 +154,57 @@ export const Header: React.FC<HeaderProps> = ({
               <Settings2 className="h-4 w-4" />
             </Button>
 
+            {/* Alternador de Tema (Claro / Escuro) */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={onToggleTheme}
+              title={isDark ? "Mudar para Tema Claro" : "Mudar para Tema Escuro"}
+            >
+              {isDark ? (
+                <Sun className="h-4 w-4 text-amber-400 hover:rotate-45 transition-transform" />
+              ) : (
+                <Moon className="h-4 w-4 text-indigo-500 hover:-rotate-12 transition-transform" />
+              )}
+            </Button>
+
             {/* Avatar / Usuário */}
-            {user && (
-              <div className="flex items-center gap-2 pl-1 border-l border-border/60">
-                {user.picture ? (
-                  <img
-                    src={user.picture}
-                    alt={user.name}
-                    className="h-8 w-8 rounded-full border border-border/80 object-cover"
-                  />
+            {user ? (
+              <div className="flex items-center gap-2 pl-2 border-l border-border/60">
+                <UserAvatar user={user} size="md" />
+                <div className="hidden lg:flex flex-col text-left">
+                  <span className="text-xs font-semibold text-foreground line-clamp-1 leading-tight">
+                    {user.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground line-clamp-1 leading-tight">
+                    {user.isGuest ? "Visitante" : user.email}
+                  </span>
+                </div>
+
+                {user.isGuest ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onLogout}
+                    className="h-7 px-2 text-[11px] gap-1 text-primary border-primary/30 hover:bg-primary/10 ml-1"
+                    title="Fazer login na sua conta pessoal"
+                  >
+                    <LogIn className="h-3 w-3" />
+                    Entrar
+                  </Button>
                 ) : (
-                  <div className="h-8 w-8 rounded-full bg-secondary flex items-center justify-center text-xs font-bold text-foreground">
-                    {user.name.charAt(0)}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    title="Sair / Trocar de conta"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                  </button>
                 )}
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                  title="Sair da conta"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

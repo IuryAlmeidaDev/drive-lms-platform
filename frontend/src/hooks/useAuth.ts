@@ -32,9 +32,7 @@ export function useAuth() {
       ? "Iury Colombo"
       : name || cleanEmail.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
 
-    const userPicture = isIury
-      ? "https://lh3.googleusercontent.com/a/ACg8ocJLxhrBNOpTMDm-iTKLRQE2cPVjmWW3S82UslzuYshxg8HtN8V4=s96-c"
-      : picture || undefined;
+    const userPicture = picture || undefined;
 
     const newUser: User = {
       id: "u_" + Math.random().toString(36).substring(2, 9),
